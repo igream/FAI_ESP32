@@ -1,12 +1,12 @@
 services:
 - type: web
-  name: pryMongoEsp32
+  name: FAIRender_ESP32
   runtime: python
-  repo: https://github.com/delateja80/pryMongoEsp32
+  repo: https://github.com/igream/FAI_ESP32
   plan: free
   envVars:
   - key: MONGO_URI
-    value: mongodb+srv://ejemploclase:ejemploclase@cluster0.6u3lhvv.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
+    value: mongodb+srv://Administrador:<db_password>@bd2.5ndlg.mongodb.net/?retryWrites=true&w=majority&appName=BD2
   region: oregon
   buildCommand: pip install -r requirements.txt
   startCommand: python app.py
