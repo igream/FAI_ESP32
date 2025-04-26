@@ -1,6 +1,6 @@
 services:
 - type: web
-  name: pryMongoEsp32
+  name: FAIRender_ESP32
   runtime: python
   repo: https://github.com/igream/FAI_ESP32
   plan: free
