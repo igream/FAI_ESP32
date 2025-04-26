@@ -1,13 +1,13 @@
 services:
-- type: web
-  name: BasePryEsp32
-  runtime: python
-  repo: https://github.com/igream/FAI_ESP32
-  plan: free
-  envVars:
-  - key: MONGO_URI
-    value: mongodb+srv://Administrador:contrasena123@bd2.5ndlg.mongodb.net/?retryWrites=true&w=majority&appName=BD2
-  region: oregon
-  buildCommand: pip install -r requirements.txt
-  startCommand: python app.py
+  - type: web
+    name: pryMongoEsp32
+    runtime: python
+    repo: https://github.com/igream/FAI_ESP32
+    plan: free
+    envVars:
+      - key: MONGO_URI
+        value: mongodb+srv://Administrador:contrasena123@bd2.5ndlg.mongodb.net/?retryWrites=true&w=majority&appName=BD2
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
 version: "1"
