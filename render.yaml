@@ -1,6 +1,6 @@
 services:
 - type: web
-  name: FAIRender_ESP32
+  name: BasePryEsp32
   runtime: python
   repo: https://github.com/igream/FAI_ESP32
   plan: free
