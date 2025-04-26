@@ -6,7 +6,7 @@ services:
   plan: free
   envVars:
   - key: MONGO_URI
-    value: mongodb+srv://Administrador:AdminPassword@bd2.5ndlg.mongodb.net/?retryWrites=true&w=majority&appName=BD2
+    value: mongodb+srv://Administrador:contrasena123@bd2.5ndlg.mongodb.net/?retryWrites=true&w=majority&appName=BD2
   region: oregon
   buildCommand: pip install -r requirements.txt
   startCommand: python app.py
