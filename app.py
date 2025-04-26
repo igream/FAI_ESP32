@@ -37,11 +37,21 @@ def generar_dato(timestamp_actual):
     temperatura += random.normalvariate(0, 0.8)
     temperatura = round(max(5.0, min(27.0, temperatura)), 1)
     humedad = round(random.uniform(0.0, 7.0), 1)
-
-    if 6 <= timestamp_actual.hour <= 18:
-        luz = random.randint(1500, 4000)
-    else:
-        luz = random.randint(0, 800)
+    
+    hora = timestamp_actual.hour
+    
+    if 5 <= hora < 8:  
+        luz = random.randint(300, 1000)
+    elif 8 <= hora < 11:  
+        luz = random.randint(1000, 2500)
+    elif 11 <= hora < 15:  
+        luz = random.randint(2500, 4000)
+    elif 15 <= hora < 18: 
+        luz = random.randint(1500, 3000)
+    elif 18 <= hora < 21:  
+        luz = random.randint(300, 1000)
+    else: 
+        luz = random.randint(0, 200)
 
     movimiento = 1 if random.random() < 0.05 else 0
 
