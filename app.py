@@ -12,7 +12,7 @@ CORS(app)
 # MongoDB Atlas URI desde variable de entorno
 MONGO_URI = os.environ.get("MONGO_URI")
 client = MongoClient(MONGO_URI)
-db = client["BasePryEsp32"]
+db = client["BD2"]
 collection = db["Datos"]
 
 
