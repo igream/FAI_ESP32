@@ -85,7 +85,55 @@ def obtener_datos():
     for dato in datos:
         dato["_id"] = str(dato["_id"])  
     return jsonify(datos)
+@app.route("/datos", methods=["GET"])
+def ver_datos_html():
+    datos = list(collection.find().sort("timestamp", -1).limit(50))
+    for dato in datos:
+        dato["_id"] = str(dato["_id"])
 
+    # Template HTML directamente en el código
+    template_html = """
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <title>Datos de sensores</title>
+        <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            table { border-collapse: collapse; width: 100%; }
+            th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+            th { background-color: #f2f2f2; }
+        </style>
+    </head>
+    <body>
+        <h2>Datos Recientes del Sensor</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Fecha y hora</th>
+                    <th>Temperatura (°C)</th>
+                    <th>Humedad (%)</th>
+                    <th>Luz (lux)</th>
+                    <th>Movimiento</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for dato in datos %}
+                <tr>
+                    <td>{{ dato.timestamp }}</td>
+                    <td>{{ dato.temperatura }}</td>
+                    <td>{{ dato.humedad }}</td>
+                    <td>{{ dato.luz }}</td>
+                    <td>{{ "Sí" if dato.movimiento else "No" }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </body>
+    </html>
+    """
+    return render_template_string(template_html, datos=datos)
+    
 if __name__ == "__main__":
     Thread(target=simulador, daemon=True).start()
     app.run(host="0.0.0.0", port=10000)
