@@ -1,68 +1,73 @@
 import os
-from flask import Flask, request, jsonify
-from flask_cors import CORS
+import time
+import random
+import math
+import uuid
+from datetime import datetime
+from flask import Flask, jsonify
 from pymongo import MongoClient
-from datetime import datetime, timedelta
-from pytz import timezone
-from zoneinfo import ZoneInfo
+from threading import Thread
 
+# Crear app de Flask
 app = Flask(__name__)
-CORS(app)
 
-# MongoDB Atlas URI desde variable de entorno
-MONGO_URI = os.environ.get("MONGO_URI")
-client = MongoClient(MONGO_URI)
-db = client["BasePryEsp32"]
-collection = db["Datos"]
+# Configurar conexión a MongoDB
+mongo_uri = os.getenv('MONGO_URI')
+client = MongoClient(mongo_uri)
+db = client['BasePryEsp32']
+collection = db['Datos']
 
+dispositivo_id = "ESP32_01"
 
+def generar_dato(timestamp_actual):
+    hora_actual = timestamp_actual.hour + timestamp_actual.minute / 60.0
 
-# Ruta para recibir datos del ESP32
-@app.route("/api/data", methods=["POST"])
-def recibir_dato():
-    try:
-        data = request.get_json()
-        print("JSON recibido:", data)
+    # Simular temperatura
+    temperatura_base = 16 + 11 * math.sin((math.pi / 12) * (hora_actual - 6))
+    temperatura = round(random.normalvariate(temperatura_base, 1.0), 1)
+    temperatura = max(5.0, min(27.0, temperatura))
 
-        required_keys = ["dispositivo", "temperatura", "humedad", "luz", "movimiento"]
-        if not all(k in data for k in required_keys):
-            return jsonify({"error": "Faltan campos"}), 400
+    # Humedad baja
+    humedad = round(random.uniform(0.0, 7.0), 1)
 
-        if not (isinstance(data["temperatura"], (int, float)) and
-                isinstance(data["humedad"], (int, float)) and
-                isinstance(data["luz"], int) and
-                isinstance(data["movimiento"], int)):
-            return jsonify({"error": "Tipos inválidos"}), 400
+    # Luz basada en hora
+    if 6 <= timestamp_actual.hour <= 18:
+        luz = random.randint(1500, 4000)
+    else:
+        luz = random.randint(0, 800)
 
-        documento = {
-            "dispositivo": data["dispositivo"],
-            "temperatura": float(data["temperatura"]),
-            "humedad": float(data["humedad"]),
-            "luz": int(data["luz"]),
-            "movimiento": int(data["movimiento"]),
-            "timestamp": datetime.utcnow() - timedelta(hours=6)
-        }
-        result = collection.insert_one(documento)
-        return jsonify({"message": "Guardado", "id": str(result.inserted_id)}), 200
-    except Exception as e:
-        print("Error MongoDB:", str(e))
-        return jsonify({"error": str(e)}), 500
+    # Movimiento con baja probabilidad
+    movimiento = 1 if random.random() < 0.05 else 0
 
+    return {
+        "_id": str(uuid.uuid4().hex),
+        "dispositivo": dispositivo_id,
+        "temperatura": temperatura,
+        "humedad": humedad,
+        "luz": luz,
+        "movimiento": movimiento,
+        "timestamp": timestamp_actual.isoformat()
+    }
 
+def simulador():
+    print("Simulador iniciado... Enviando datos a MongoDB cada 60 segundos.")
+    while True:
+        ahora = datetime.now()
+        dato = generar_dato(ahora)
+        collection.insert_one(dato)
+        print(f"[{ahora}] Dato insertado: {dato}")
+        time.sleep(60)
 
-# Ruta para ver los últimos 50 datos
 @app.route("/api/datos", methods=["GET"])
-def ver_datos():
-    datos = list(collection.find().sort("timestamp", -1).limit(5000))
-    for d in datos:
-        d["_id"] = str(d["_id"])
-        d["timestamp"] = d["timestamp"].isoformat()
-
-    return jsonify(datos), 200
-
-@app.route("/", methods=["GET"])
-def index():
-    return "API Flask con MongoDB funcionando en Render", 200
+def obtener_datos():
+    datos = list(collection.find().sort("timestamp", -1).limit(100))  # Últimos 100 datos
+    for dato in datos:
+        dato["_id"] = str(dato["_id"])  # Convertir ObjectId a string
+    return jsonify(datos)
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    # Ejecutar simulador en segundo plano
+    Thread(target=simulador, daemon=True).start()
+
+    # Correr el servidor Flask
+    app.run(host="0.0.0.0", port=10000)
