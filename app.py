@@ -53,7 +53,7 @@ def recibir_dato():
 # Ruta para ver los últimos 50 datos
 @app.route("/api/datos", methods=["GET"])
 def ver_datos():
-    datos = list(collection.find().sort("timestamp", -1).limit(50))
+    datos = list(collection.find().sort("timestamp", -1).limit(5000))
     for d in datos:
         d["_id"] = str(d["_id"])
         d["timestamp"] = d["timestamp"].isoformat()
