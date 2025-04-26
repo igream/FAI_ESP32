@@ -75,6 +75,10 @@ def simulador():
         print(f"[{ahora}] Dato insertado: {dato}")
         time.sleep(60)
 
+@app.route('/')
+def home():
+    return 'API Flask con MongoDB funcionando en Render', 200
+
 @app.route("/api/datos", methods=["GET"])
 def obtener_datos():
     datos = list(collection.find().sort("timestamp", -1).limit(100))  
