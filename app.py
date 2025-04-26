@@ -22,7 +22,7 @@ dispositivo_id = "ESP32_01"
 def generar_dato(timestamp_actual):
     hora_actual = timestamp_actual.hour + timestamp_actual.minute / 60.0
 
-    temp_min = 9    
+    temp_min = 6   
     temp_max = 27 
     if 6 <= hora_actual <= 15:
         progreso = (hora_actual - 6) / (15 - 6)  
