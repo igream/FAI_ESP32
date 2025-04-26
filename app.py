@@ -81,7 +81,7 @@ def home():
 
 @app.route("/api/datos", methods=["GET"])
 def obtener_datos():
-    datos = list(collection.find().sort("timestamp", -1).limit(100))  
+    datos = list(collection.find().sort("timestamp", -1).limit(50))  
     for dato in datos:
         dato["_id"] = str(dato["_id"])  
     return jsonify(datos)
