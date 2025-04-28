@@ -3,7 +3,7 @@ import time
 import random
 import math
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from flask import Flask, jsonify, render_template_string
 from pymongo import MongoClient
 from threading import Thread
@@ -58,8 +58,9 @@ def generar_dato(timestamp_actual):
 
 def simulador():
     print("Simulador iniciado... Enviando datos a MongoDB cada 60 segundos.")
+    zona_horaria = timezone(timedelta(hours=-6))  # UTC-6
     while True:
-        ahora = datetime.now()
+        ahora = datetime.now(zona_horaria)  # ahora con zona horaria UTC-6
         dato = generar_dato(ahora)
         collection.insert_one(dato)
         print(f"[{ahora}] Dato insertado: {dato}")
