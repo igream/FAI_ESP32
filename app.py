@@ -4,65 +4,48 @@ import random
 import math
 import uuid
 from datetime import datetime
-from zoneinfo import ZoneInfo
 from flask import Flask, jsonify, render_template_string
 from pymongo import MongoClient
 from threading import Thread
 
 app = Flask(__name__)
 
-# Conexión a MongoDB
 mongo_uri = os.getenv('MONGO_URI')
 client = MongoClient(mongo_uri)
 db = client['BasePryEsp32']
 collection = db['Datos']
 dispositivo_id = "ESP32_01"
 
-# Zona horaria de Ciudad de México
-TZ = ZoneInfo("America/Mexico_City")
-
 def generar_dato(timestamp_actual):
     hora_actual = timestamp_actual.hour + timestamp_actual.minute / 60.0
     temp_min = 6   
     temp_max = 27 
-
-    # Perfil de temperatura diurno/nocturno
     if 6 <= hora_actual <= 15:
-        progreso = (hora_actual - 6) / (15 - 6)
+        progreso = (hora_actual - 6) / (15 - 6)  
         temperatura = temp_min + (temp_max - temp_min) * progreso
     else:
-        # Desde las 15 hasta las 6 del día siguiente
         if hora_actual > 15:
-            progreso = (hora_actual - 15) / (24 - 15 + 6)
-        else:
+            progreso = (hora_actual - 15) / (24 - 15 + 6) 
+        else:  
             progreso = (hora_actual + 9) / (24 - 15 + 6)
         temperatura = temp_max - (temp_max - temp_min) * progreso
-
-    # Ruido gaussiano y acotación
     temperatura += random.normalvariate(0, 0.8)
     temperatura = round(max(5.0, min(27.0, temperatura)), 1)
-
-    # Humedad aleatoria
     humedad = round(random.uniform(0.0, 1.5), 1)
-
-    # Nivel de luz según la hora
     hora = timestamp_actual.hour
-    if 5 <= hora < 8:
+    if 5 <= hora < 8:  
         luz = random.randint(300, 1000)
-    elif 8 <= hora < 11:
+    elif 8 <= hora < 11:  
         luz = random.randint(1000, 2500)
-    elif 11 <= hora < 15:
+    elif 11 <= hora < 15:  
         luz = random.randint(2500, 4000)
-    elif 15 <= hora < 18:
+    elif 15 <= hora < 18: 
         luz = random.randint(1500, 3000)
-    elif 18 <= hora < 21:
+    elif 18 <= hora < 21:  
         luz = random.randint(300, 1000)
-    else:
+    else: 
         luz = random.randint(0, 200)
-
-    # Detección de movimiento (5% de probabilidad)
     movimiento = 1 if random.random() < 0.05 else 0
-
     return {
         "_id": str(uuid.uuid4().hex),
         "dispositivo": dispositivo_id,
@@ -70,18 +53,16 @@ def generar_dato(timestamp_actual):
         "humedad": humedad,
         "luz": luz,
         "movimiento": movimiento,
-        # isoformat() incluirá el offset de zona
         "timestamp": timestamp_actual.isoformat()
     }
 
 def simulador():
     print("Simulador iniciado... Enviando datos a MongoDB cada 60 segundos.")
     while True:
-        # Generar hora local con zona de Ciudad de México
-        ahora = datetime.now(TZ)
+        ahora = datetime.now()
         dato = generar_dato(ahora)
         collection.insert_one(dato)
-        print(f"[{ahora.isoformat()}] Dato insertado: {dato}")
+        print(f"[{ahora}] Dato insertado: {dato}")
         time.sleep(60)
 
 @app.route('/')
@@ -144,6 +125,5 @@ def ver_datos_html():
     return render_template_string(template_html, datos=datos)
 
 if __name__ == "__main__":
-    # Arranca el hilo simulador en background
     Thread(target=simulador, daemon=True).start()
     app.run(host="0.0.0.0", port=10000)
