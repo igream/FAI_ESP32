@@ -4,6 +4,7 @@ import random
 import math
 import uuid
 from datetime import datetime
+from zoneinfo import ZoneInfo  
 from flask import Flask, jsonify, render_template_string
 from pymongo import MongoClient
 from threading import Thread
@@ -16,6 +17,8 @@ db = client['BasePryEsp32']
 collection = db['Datos']
 dispositivo_id = "ESP32_01"
 
+zona_horaria_local = ZoneInfo("America/Mexico_City")  
+
 def generar_dato(timestamp_actual):
     hora_actual = timestamp_actual.hour + timestamp_actual.minute / 60.0
     temp_min = 6   
@@ -26,7 +29,7 @@ def generar_dato(timestamp_actual):
     else:
         if hora_actual > 15:
             progreso = (hora_actual - 15) / (24 - 15 + 6) 
-        else:  
+        else:
             progreso = (hora_actual + 9) / (24 - 15 + 6)
         temperatura = temp_max - (temp_max - temp_min) * progreso
     temperatura += random.normalvariate(0, 0.8)
@@ -59,7 +62,7 @@ def generar_dato(timestamp_actual):
 def simulador():
     print("Simulador iniciado... Enviando datos a MongoDB cada 60 segundos.")
     while True:
-        ahora = datetime.now()
+        ahora = datetime.now(tz=zona_horaria_local) 
         dato = generar_dato(ahora)
         collection.insert_one(dato)
         print(f"[{ahora}] Dato insertado: {dato}")
