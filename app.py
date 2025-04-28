@@ -34,7 +34,7 @@ def generar_dato(timestamp_actual):
         temperatura = temp_max - (temp_max - temp_min) * progreso
     temperatura += random.normalvariate(0, 0.8)
     temperatura = round(max(5.0, min(27.0, temperatura)), 1)
-    humedad = round(random.uniform(0.0, 1.5), 1)
+    humedad = round(random.uniform(0.0, 0.5), 1)
     hora = timestamp_actual.hour
     if 5 <= hora < 8:  
         luz = random.randint(300, 1000)
