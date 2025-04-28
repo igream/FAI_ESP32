@@ -8,21 +8,16 @@ from flask import Flask, jsonify, render_template_string
 from pymongo import MongoClient
 from threading import Thread
 
-# Crear app de Flask
 app = Flask(__name__)
 
-# Configurar conexión a MongoDB
 mongo_uri = os.getenv('MONGO_URI')
 client = MongoClient(mongo_uri)
 db = client['BasePryEsp32']
 collection = db['Datos']
-
 dispositivo_id = "ESP32_01"
 
-# Función para generar un dato simulado
 def generar_dato(timestamp_actual):
     hora_actual = timestamp_actual.hour + timestamp_actual.minute / 60.0
-
     temp_min = 6   
     temp_max = 27 
     if 6 <= hora_actual <= 15:
@@ -34,13 +29,10 @@ def generar_dato(timestamp_actual):
         else:  
             progreso = (hora_actual + 9) / (24 - 15 + 6)
         temperatura = temp_max - (temp_max - temp_min) * progreso
-
     temperatura += random.normalvariate(0, 0.8)
     temperatura = round(max(5.0, min(27.0, temperatura)), 1)
     humedad = round(random.uniform(0.0, 1.5), 1)
-    
     hora = timestamp_actual.hour
-    
     if 5 <= hora < 8:  
         luz = random.randint(300, 1000)
     elif 8 <= hora < 11:  
@@ -53,9 +45,7 @@ def generar_dato(timestamp_actual):
         luz = random.randint(300, 1000)
     else: 
         luz = random.randint(0, 200)
-
     movimiento = 1 if random.random() < 0.05 else 0
-
     return {
         "_id": str(uuid.uuid4().hex),
         "dispositivo": dispositivo_id,
@@ -66,7 +56,6 @@ def generar_dato(timestamp_actual):
         "timestamp": timestamp_actual.isoformat()
     }
 
-# Función del simulador en segundo plano
 def simulador():
     print("Simulador iniciado... Enviando datos a MongoDB cada 60 segundos.")
     while True:
@@ -76,12 +65,10 @@ def simulador():
         print(f"[{ahora}] Dato insertado: {dato}")
         time.sleep(60)
 
-# Ruta principal
 @app.route('/')
 def home():
     return 'API Flask con MongoDB funcionando en Render', 200
 
-# API para obtener datos en JSON
 @app.route("/api/datos", methods=["GET"])
 def obtener_datos():
     datos = list(collection.find().sort("timestamp", -1).limit(50))
@@ -89,7 +76,6 @@ def obtener_datos():
         dato["_id"] = str(dato["_id"])
     return jsonify(datos)
 
-# Ruta para visualizar datos en tabla HTML
 @app.route("/datos", methods=["GET"])
 def ver_datos_html():
     datos = list(collection.find().sort("timestamp", -1).limit(50))
@@ -138,7 +124,6 @@ def ver_datos_html():
     """
     return render_template_string(template_html, datos=datos)
 
-# Inicio de la app
 if __name__ == "__main__":
     Thread(target=simulador, daemon=True).start()
     app.run(host="0.0.0.0", port=10000)
