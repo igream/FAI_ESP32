@@ -7,9 +7,6 @@ from datetime import datetime
 from flask import Flask, jsonify, render_template_string
 from pymongo import MongoClient
 from threading import Thread
-import pytz
-
-tz_mx = pytz.timezone('America/Mexico_City')
 
 app = Flask(__name__)
 
@@ -62,7 +59,7 @@ def generar_dato(timestamp_actual):
 def simulador():
     print("Simulador iniciado... Enviando datos a MongoDB cada 60 segundos.")
     while True:
-        ahora = datetime.now(tz_mx)  
+        ahora = datetime.now()
         dato = generar_dato(ahora)
         collection.insert_one(dato)
         print(f"[{ahora}] Dato insertado: {dato}")
@@ -84,11 +81,8 @@ def ver_datos_html():
     datos = list(collection.find().sort("timestamp", -1).limit(50))
     for dato in datos:
         dato["_id"] = str(dato["_id"])
-        # Formatear el timestamp
-        dt = datetime.fromisoformat(dato["timestamp"].replace("Z", "+00:00")).astimezone(tz_mx)
-        dato["timestamp"] = dt.strftime("%d/%m/%Y %H:%M")
-    
-    template_html = """ 
+
+    template_html = """
     <!DOCTYPE html>
     <html lang="es">
     <head>
@@ -132,5 +126,4 @@ def ver_datos_html():
 
 if __name__ == "__main__":
     Thread(target=simulador, daemon=True).start()
-    port = int(os.environ.get('PORT', 10000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=10000)
