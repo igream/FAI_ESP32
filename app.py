@@ -84,8 +84,11 @@ def ver_datos_html():
     datos = list(collection.find().sort("timestamp", -1).limit(50))
     for dato in datos:
         dato["_id"] = str(dato["_id"])
-
-    template_html = """
+        # Formatear el timestamp
+        dt = datetime.fromisoformat(dato["timestamp"]).astimezone(tz_mx)
+        dato["timestamp"] = dt.strftime("%d/%m/%Y %H:%M")
+    
+    template_html = """ 
     <!DOCTYPE html>
     <html lang="es">
     <head>
