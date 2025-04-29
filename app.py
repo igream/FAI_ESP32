@@ -85,7 +85,7 @@ def ver_datos_html():
     for dato in datos:
         dato["_id"] = str(dato["_id"])
         # Formatear el timestamp
-        dt = datetime.fromisoformat(dato["timestamp"]).astimezone(tz_mx)
+        dt = datetime.fromisoformat(dato["timestamp"].replace("Z", "+00:00")).astimezone(tz_mx)
         dato["timestamp"] = dt.strftime("%d/%m/%Y %H:%M")
     
     template_html = """ 
@@ -132,4 +132,5 @@ def ver_datos_html():
 
 if __name__ == "__main__":
     Thread(target=simulador, daemon=True).start()
-    app.run(host="0.0.0.0", port=10000)
+    port = int(os.environ.get('PORT', 10000))
+    app.run(host="0.0.0.0", port=port)
