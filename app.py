@@ -19,7 +19,7 @@ app = Flask(__name__)
 # Configuración de MongoDB
 mongo_uri = os.getenv('MONGO_URI', 'mongodb://localhost:27017')  # Valor por defecto para pruebas locales
 try:
-    client = MongoClient(mongo_uri)
+    client = MongoClient("mongodb+srv://Administrador:contrasena123@bd2.5ndlg.mongodb.net/?retryWrites=true&w=majority&appName=BD2")
     db = client['BasePryEsp32']
     collection = db['Datos']
     logger.info("Conexión a MongoDB establecida correctamente.")
