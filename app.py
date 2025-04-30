@@ -7,6 +7,7 @@ from datetime import datetime
 from flask import Flask, jsonify, render_template_string
 from pymongo import MongoClient
 from threading import Thread
+import pytz  
 
 app = Flask(__name__)
 
@@ -16,8 +17,12 @@ db = client['BasePryEsp32']
 collection = db['Datos']
 dispositivo_id = "ESP32_01"
 
+tz_mexico = pytz.timezone('America/Mexico_City')
+
 def generar_dato(timestamp_actual):
-    hora_actual = timestamp_actual.hour + timestamp_actual.minute / 60.0
+    # Asegurarse de que el timestamp esté en GMT-6
+    timestamp_mexico = timestamp_actual.astimezone(tz_mexico)
+    hora_actual = timestamp_mexico.hour + timestamp_mexico.minute / 60.0
     temp_min = 6   
     temp_max = 27 
     if 6 <= hora_actual <= 15:
@@ -32,7 +37,7 @@ def generar_dato(timestamp_actual):
     temperatura += random.normalvariate(0, 0.8)
     temperatura = round(max(5.0, min(27.0, temperatura)), 1)
     humedad = round(random.uniform(0.0, 1.5), 1)
-    hora = timestamp_actual.hour
+    hora = timestamp_mexico.hour
     if 5 <= hora < 8:  
         luz = random.randint(300, 1000)
     elif 8 <= hora < 11:  
@@ -53,13 +58,14 @@ def generar_dato(timestamp_actual):
         "humedad": humedad,
         "luz": luz,
         "movimiento": movimiento,
-        "timestamp": timestamp_actual.isoformat()
+        "timestamp": timestamp_mexico.isoformat()  # Guardar timestamp en GMT-6
     }
 
 def simulador():
     print("Simulador iniciado... Enviando datos a MongoDB cada 60 segundos.")
     while True:
-        ahora = datetime.now()
+        # Obtener la hora actual en GMT-6
+        ahora = datetime.now(tz_mexico)
         dato = generar_dato(ahora)
         collection.insert_one(dato)
         print(f"[{ahora}] Dato insertado: {dato}")
