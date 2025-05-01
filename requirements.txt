@@ -1,4 +1,4 @@
 flask
-pymongo[srv]>=4.5.0
+pymongo
 flask-cors
-pytz>=2023.3
+pytz
