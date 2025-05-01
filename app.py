@@ -59,8 +59,8 @@ def generar_dato(timestamp_actual):
 def simulador():
     print("Simulador iniciado... Enviando datos a MongoDB cada 60 segundos.")
     while True:
-        ahora = datetime.now() - timedelta(hours=6)
-        dato = generar_dato(ahora)
+        ahora = datetime.now() - timedelta(hours=7)
+        dato = generar_dato(ahora) 
         collection.insert_one(dato)
         print(f"[{ahora}] Dato insertado: {dato}")
         time.sleep(60)
