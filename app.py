@@ -1,181 +1,129 @@
 import os
 import time
 import random
+import math
 import uuid
-from datetime import datetime
-import pytz
+from datetime import datetime, timedelta
 from flask import Flask, jsonify, render_template_string
 from pymongo import MongoClient
-from pymongo.errors import ConnectionFailure, PyMongoError
 from threading import Thread
 
 app = Flask(__name__)
 
-# Configuración de la zona horaria de San Felipe del Progreso (America/Mexico_City, UTC-6)
-MEXICO_TZ = pytz.timezone('America/Mexico_City')
-
-# Conexión a MongoDB
 mongo_uri = os.getenv('MONGO_URI')
-if not mongo_uri:
-    print("Error: MONGO_URI no está configurada en las variables de entorno.")
-    raise EnvironmentError("MONGO_URI no está configurada.")
-
-try:
-    client = MongoClient(mongo_uri)
-    # Verificar la conexión
-    client.admin.command('ping')
-    db = client['BasePryEsp32']
-    collection = db['Datos']
-except ConnectionFailure as e:
-    print(f"Error: No se pudo conectar a MongoDB: {e}")
-    raise
-except PyMongoError as e:
-    print(f"Error al configurar MongoDB: {e}")
-    raise
-
+client = MongoClient(mongo_uri)
+db = client['BasePryEsp32']
+collection = db['Datos']
 dispositivo_id = "ESP32_01"
 
 def generar_dato(timestamp_actual):
-    try:
-        hora_actual = timestamp_actual.hour + timestamp_actual.minute / 60.0
-        temp_min = 6   
-        temp_max = 27 
-        if 6 <= hora_actual <= 15:
-            progreso = (hora_actual - 6) / (15 - 6)  
-            temperatura = temp_min + (temp_max - temp_min) * progreso
-        else:
-            if hora_actual > 15:
-                progreso = (hora_actual - 15) / (24 - 15 + 6) 
-            else:  
-                progreso = (hora_actual + 9) / (24 - 15 + 6)
-            temperatura = temp_max - (temp_max - temp_min) * progreso
-        temperatura += random.normalvariate(0, 0.8)
-        temperatura = round(max(5.0, min(27.0, temperatura)), 1)
-        humedad = round(random.uniform(0.0, 1.5), 1)
-        hora = timestamp_actual.hour
-        if 5 <= hora < 8:  
-            luz = random.randint(300, 1000)
-        elif 8 <= hora < 11:  
-            luz = random.randint(1000, 2500)
-        elif 11 <= hora < 15:  
-            luz = random.randint(2500, 4000)
-        elif 15 <= hora < 18: 
-            luz = random.randint(1500, 3000)
-        elif 18 <= hora < 21:  
-            luz = random.randint(300, 1000)
-        else: 
-            luz = random.randint(0, 200)
-        movimiento = 1 if random.random() < 0.05 else 0
-        return {
-            "_id": str(uuid.uuid4().hex),
-            "dispositivo": dispositivo_id,
-            "temperatura": temperatura,
-            "humedad": humedad,
-            "luz": luz,
-            "movimiento": movimiento,
-            "timestamp": timestamp_actual.isoformat()
-        }
-    except Exception as e:
-        print(f"Error al generar dato: {e}")
-        raise
+    hora_actual = timestamp_actual.hour + timestamp_actual.minute / 60.0
+    temp_min = 6   
+    temp_max = 27 
+    if 6 <= hora_actual <= 15:
+        progreso = (hora_actual - 6) / (15 - 6)  
+        temperatura = temp_min + (temp_max - temp_min) * progreso
+    else:
+        if hora_actual > 15:
+            progreso = (hora_actual - 15) / (24 - 15 + 6) 
+        else:  
+            progreso = (hora_actual + 9) / (24 - 15 + 6)
+        temperatura = temp_max - (temp_max - temp_min) * progreso
+    temperatura += random.normalvariate(0, 0.8)
+    temperatura = round(max(5.0, min(27.0, temperatura)), 1)
+    humedad = round(random.uniform(0.0, 1.5), 1)
+    hora = timestamp_actual.hour
+    if 5 <= hora < 8:  
+        luz = random.randint(300, 1000)
+    elif 8 <= hora < 11:  
+        luz = random.randint(1000, 2500)
+    elif 11 <= hora < 15:  
+        luz = random.randint(2500, 4000)
+    elif 15 <= hora < 18: 
+        luz = random.randint(1500, 3000)
+    elif 18 <= hora < 21:  
+        luz = random.randint(300, 1000)
+    else: 
+        luz = random.randint(0, 200)
+    movimiento = 1 if random.random() < 0.05 else 0
+    return {
+        "_id": str(uuid.uuid4().hex),
+        "dispositivo": dispositivo_id,
+        "temperatura": temperatura,
+        "humedad": humedad,
+        "luz": luz,
+        "movimiento": movimiento,
+        "timestamp": timestamp_actual.isoformat()
+    }
 
 def simulador():
     print("Simulador iniciado... Enviando datos a MongoDB cada 60 segundos.")
     while True:
-        try:
-            # Obtener la hora actual en la zona horaria de Mexico City
-            ahora = datetime.now(MEXICO_TZ)
-            dato = generar_dato(ahora)
-            collection.insert_one(dato)
-            print(f"[{ahora}] Dato insertado: {dato}")
-        except PyMongoError as e:
-            print(f"Error al insertar dato en MongoDB: {e}")
-        except Exception as e:
-            print(f"Error en el simulador: {e}")
+        ahora = datetime.now() - timedelta(hours=6)
+        dato = generar_dato(ahora)
+        collection.insert_one(dato)
+        print(f"[{ahora}] Dato insertado: {dato}")
         time.sleep(60)
 
 @app.route('/')
 def home():
-    try:
-        return 'API Flask con MongoDB funcionando en Render', 200
-    except Exception as e:
-        print(f"Error en la ruta /: {e}")
-        return 'Error interno del servidor', 500
+    return 'API Flask con MongoDB funcionando en Render', 200
 
 @app.route("/api/datos", methods=["GET"])
 def obtener_datos():
-    try:
-        datos = list(collection.find().sort("timestamp", -1).limit(50))
-        for dato in datos:
-            dato["_id"] = str(dato["_id"])
-        return jsonify(datos)
-    except PyMongoError as e:
-        print(f"Error al obtener datos de MongoDB: {e}")
-        return jsonify({"error": "Error al consultar la base de datos"}), 500
-    except Exception as e:
-        print(f"Error en la ruta /api/datos: {e}")
-        return jsonify({"error": "Error interno del servidor"}), 500
+    datos = list(collection.find().sort("timestamp", -1).limit(50))
+    for dato in datos:
+        dato["_id"] = str(dato["_id"])
+    return jsonify(datos)
 
 @app.route("/datos", methods=["GET"])
 def ver_datos_html():
-    try:
-        datos = list(collection.find().sort("timestamp", -1).limit(50))
-        for dato in datos:
-            dato["_id"] = str(dato["_id"])
+    datos = list(collection.find().sort("timestamp", -1).limit(50))
+    for dato in datos:
+        dato["_id"] = str(dato["_id"])
 
-        template_html = """
-        <!DOCTYPE html>
-        <html lang="es">
-        <head>
-            <meta charset="UTF-8">
-            <title>Datos de sensores</title>
-            <style>
-                body { font-family: Arial, sans-serif; padding: 20px; }
-                table { border-collapse: collapse; width: 100%; }
-                th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
-                th { background-color: #f2f2f2; }
-            </style>
-        </head>
-        <body>
-            <h2>Datos Recientes del Sensor</h2>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Fecha y hora</th>
-                        <th>Temperatura (°C)</th>
-                        <th>Humedad (%)</th>
-                        <th>Luz (lux)</th>
-                        <th>Movimiento</th>
-                    </tr>
-                </thead>
-                <tbody>
-                {% for dato in datos %}
-                    <tr>
-                        <td>{{ dato.timestamp }}</td>
-                        <td>{{ dato.temperatura }}</td>
-                        <td>{{ dato.humedad }}</td>
-                        <td>{{ dato.luz }}</td>
-                        <td>{{ "Sí" if dato.movimiento else "No" }}</td>
-                    </tr>
-                {% endfor %}
-                </tbody>
-            </table>
-        </body>
-        </html>
-        """
-        return render_template_string(template_html, datos=datos)
-    except PyMongoError as e:
-        print(f"Error al obtener datos para HTML: {e}")
-        return "Error al consultar la base de datos", 500
-    except Exception as e:
-        print(f"Error en la ruta /datos: {e}")
-        return "Error interno del servidor", 500
+    template_html = """
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <title>Datos de sensores</title>
+        <style>
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            table { border-collapse: collapse; width: 100%; }
+            th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+            th { background-color: #f2f2f2; }
+        </style>
+    </head>
+    <body>
+        <h2>Datos Recientes del Sensor</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Fecha y hora</th>
+                    <th>Temperatura (°C)</th>
+                    <th>Humedad (%)</th>
+                    <th>Luz (lux)</th>
+                    <th>Movimiento</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for dato in datos %}
+                <tr>
+                    <td>{{ dato.timestamp }}</td>
+                    <td>{{ dato.temperatura }}</td>
+                    <td>{{ dato.humedad }}</td>
+                    <td>{{ dato.luz }}</td>
+                    <td>{{ "Sí" if dato.movimiento else "No" }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </body>
+    </html>
+    """
+    return render_template_string(template_html, datos=datos)
 
 if __name__ == "__main__":
-    try:
-        Thread(target=simulador, daemon=True).start()
-        app.run(host="0.0.0.0", port=10000)
-    except KeyboardInterrupt:
-        print("Aplicación detenida por el usuario.")
-    except Exception as e:
-        print(f"Error al iniciar la aplicación: {e}")
+    Thread(target=simulador, daemon=True).start()
+    app.run(host="0.0.0.0", port=10000)
