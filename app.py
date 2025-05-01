@@ -59,7 +59,7 @@ def generar_dato(timestamp_actual):
 def simulador():
     print("Simulador iniciado... Enviando datos a MongoDB cada 60 segundos.")
     while True:
-        ahora = datetime.now() - timedelta(hours=7)
+        ahora = datetime.now() - timedelta(hours=6)
         dato = generar_dato(ahora) 
         collection.insert_one(dato)
         print(f"[{ahora}] Dato insertado: {dato}")
@@ -75,6 +75,10 @@ def obtener_datos():
     for dato in datos:
         dato["_id"] = str(dato["_id"])
     return jsonify(datos)
+
+@app.template_filter('datetimeformat')
+def datetimeformat(value):
+    return datetime.fromisoformat(value).strftime('%Y-%m-%d %H:%M:%S')
 
 @app.route("/datos", methods=["GET"])
 def ver_datos_html():
@@ -110,7 +114,7 @@ def ver_datos_html():
             <tbody>
             {% for dato in datos %}
                 <tr>
-                    <td>{{ dato.timestamp }}</td>
+                    <td>{{ dato.timestamp | datetimeformat }}</td>
                     <td>{{ dato.temperatura }}</td>
                     <td>{{ dato.humedad }}</td>
                     <td>{{ dato.luz }}</td>
