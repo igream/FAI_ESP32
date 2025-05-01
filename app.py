@@ -2,10 +2,12 @@ import os
 import time
 import random
 import uuid
+import signal
+import sys
 from datetime import datetime
 from flask import Flask, jsonify, render_template_string
 from pymongo import MongoClient
-from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
+from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError, InvalidOperation
 from threading import Thread
 import pytz
 
@@ -26,11 +28,13 @@ db = client['BasePryEsp32']
 collection = db['Datos']
 dispositivo_id = "ESP32_01"
 
+# Bandera para controlar el simulador
+simulador_activo = True
+
 def generar_dato(timestamp_actual):
     """Genera un dato simulado basado en la hora del día."""
     hora_actual = timestamp_actual.hour + timestamp_actual.minute / 60.0
     temp_min, temp_max = 6, 27
-    # Calcular temperatura según la hora del día
     if 6 <= hora_actual <= 15:
         progreso = (hora_actual - 6) / (15 - 6)
         temperatura = temp_min + (temp_max - temp_min) * progreso
@@ -39,9 +43,7 @@ def generar_dato(timestamp_actual):
         temperatura = temp_max - (temp_max - temp_min) * progreso
     temperatura += random.normalvariate(0, 0.8)
     temperatura = round(max(5.0, min(27.0, temperatura)), 1)
-    # Humedad en un rango más realista
     humedad = round(random.uniform(20.0, 80.0), 1)
-    # Generar luz según la hora
     hora = timestamp_actual.hour
     if 5 <= hora < 8:
         luz = random.randint(300, 1000)
@@ -55,7 +57,6 @@ def generar_dato(timestamp_actual):
         luz = random.randint(300, 1000)
     else:
         luz = random.randint(0, 200)
-    # Movimiento con baja probabilidad
     movimiento = 1 if random.random() < 0.05 else 0
     return {
         "_id": str(uuid.uuid4().hex),
@@ -64,24 +65,27 @@ def generar_dato(timestamp_actual):
         "humedad": humedad,
         "luz": luz,
         "movimiento": movimiento,
-        "timestamp": timestamp_actual  # Almacenar como objeto datetime
+        "timestamp": timestamp_actual
     }
 
 def simulador():
     """Simula la generación y almacenamiento de datos cada 60 segundos."""
+    global simulador_activo
     print("Simulador iniciado... Enviando datos a MongoDB cada 60 segundos.")
-    while True:
+    while simulador_activo:
         try:
             ahora = datetime.now(pytz.timezone('America/Mexico_City'))
-            # Generar dato
             dato = generar_dato(ahora)
-            # Insertar en MongoDB
             collection.insert_one(dato)
             print(f"[{ahora}] Dato insertado: {dato}")
         except ConnectionFailure as e:
             print(f"Error de conexión a MongoDB: {e}. Reintentando en 60 segundos...")
         except ServerSelectionTimeoutError as e:
             print(f"Timeout al conectar con MongoDB: {e}. Reintentando en 60 segundos...")
+        except InvalidOperation as e:
+            print(f"Operación inválida en MongoDB (posiblemente cliente cerrado): {e}. Deteniendo simulador...")
+            simulador_activo = False
+            break
         except ValueError as e:
             print(f"Error en la generación de datos: {e}. Reintentando en 60 segundos...")
         except Exception as e:
@@ -90,12 +94,24 @@ def simulador():
             time.sleep(60)
         except KeyboardInterrupt:
             print("Simulador detenido por interrupción.")
+            simulador_activo = False
             break
 
-@app.teardown_appcontext
-def cerrar_conexion(exception):
-    """Cierra la conexión a MongoDB al finalizar la aplicación."""
-    client.close()
+def cerrar_app(signum, frame):
+    """Cierra la conexión a MongoDB y detiene el simulador al terminar la aplicación."""
+    global simulador_activo
+    print(f"Señal {signum} recibida. Cerrando aplicación...")
+    simulador_activo = False
+    try:
+        client.close()
+        print("Conexión a MongoDB cerrada.")
+    except Exception as e:
+        print(f"Error al cerrar la conexión a MongoDB: {e}")
+    sys.exit(0)
+
+# Registrar manejadores de señales para SIGINT y SIGTERM
+signal.signal(signal.SIGINT, cerrar_app)
+signal.signal(signal.SIGTERM, cerrar_app)
 
 @app.route('/')
 def home():
@@ -105,19 +121,27 @@ def home():
 @app.route("/api/datos", methods=["GET"])
 def obtener_datos():
     """Obtiene los últimos 50 datos de la base de datos."""
-    datos = list(collection.find().sort("timestamp", -1).limit(50))
-    # Convertir timestamp a string solo para la respuesta
-    for dato in datos:
-        dato["timestamp"] = dato["timestamp"].isoformat()
-    return jsonify(datos)
+    try:
+        datos = list(collection.find().sort("timestamp", -1).limit(50))
+        for dato in datos:
+            dato["timestamp"] = dato["timestamp"].isoformat()
+        return jsonify(datos)
+    except InvalidOperation as e:
+        return jsonify({"error": "No se puede acceder a la base de datos: conexión cerrada"}), 500
+    except Exception as e:
+        return jsonify({"error": f"Error al obtener datos: {str(e)}"}), 500
 
 @app.route("/datos", methods=["GET"])
 def ver_datos_html():
     """Muestra los últimos 50 datos en una tabla HTML."""
-    datos = list(collection.find().sort("timestamp", -1).limit(50))
-    # Convertir timestamp a string para la plantilla
-    for dato in datos:
-        dato["timestamp"] = dato["timestamp"].isoformat()
+    try:
+        datos = list(collection.find().sort("timestamp", -1).limit(50))
+        for dato in datos:
+            dato["timestamp"] = dato["timestamp"].isoformat()
+    except InvalidOperation as e:
+        return "Error: No se puede acceder a la base de datos (conexión cerrada)", 500
+    except Exception as e:
+        return f"Error al obtener datos: {str(e)}", 500
 
     template_html = """
     <!DOCTYPE html>
@@ -162,8 +186,6 @@ def ver_datos_html():
     return render_template_string(template_html, datos=datos)
 
 if __name__ == "__main__":
-    # Iniciar el simulador en un hilo
     Thread(target=simulador, daemon=True).start()
-    # Obtener el puerto de la variable de entorno para compatibilidad con Render
     port = int(os.getenv('PORT', 10000))
     app.run(host="0.0.0.0", port=port)
