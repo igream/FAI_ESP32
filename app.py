@@ -65,7 +65,10 @@ def ver_datos():
 # Filtro para formatear fecha en plantilla
 @app.template_filter('datetimeformat')
 def datetimeformat(value):
-    return datetime.fromisoformat(value).strftime('%Y-%m-%d %H:%M:%S')
+    try:
+        return datetime.fromisoformat(value).strftime('%Y-%m-%d %H:%M:%S')
+    except Exception:
+        return "Fecha inválida"
 
 # Ruta HTML para visualizar los datos
 @app.route("/datos", methods=["GET"])
@@ -73,7 +76,14 @@ def ver_datos_html():
     datos = list(collection.find().sort("timestamp", -1).limit(50))
     for d in datos:
         d["_id"] = str(d["_id"])
-        d["timestamp"] = d["timestamp"].isoformat()
+        ts = d.get("timestamp")
+        if isinstance(ts, datetime):
+            d["timestamp"] = ts.isoformat()
+        elif isinstance(ts, str):
+            try:
+                d["timestamp"] = datetime.fromisoformat(ts).isoformat()
+            except ValueError:
+                d["timestamp"] = "INVALID_TIMESTAMP"
 
     template_html = """
     <!DOCTYPE html>
