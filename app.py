@@ -1,90 +1,71 @@
 import os
-import time
-import random
-import math
-import uuid
-from datetime import datetime, timedelta
-from flask import Flask, jsonify, render_template_string
+from flask import Flask, request, jsonify, render_template_string
+from flask_cors import CORS
 from pymongo import MongoClient
-from threading import Thread
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
+CORS(app)
 
-mongo_uri = os.getenv('MONGO_URI')
-client = MongoClient(mongo_uri)
-db = client['BasePryEsp32']
-collection = db['Datos']
-dispositivo_id = "ESP32_01"
+# MongoDB Atlas URI desde variable de entorno
+MONGO_URI = os.environ.get("MONGO_URI")
+client = MongoClient(MONGO_URI)
+db = client["BasePryEsp32"]
+collection = db["Datos"]
 
-def generar_dato(timestamp_actual):
-    hora_actual = timestamp_actual.hour + timestamp_actual.minute / 60.0
-    temp_min = 11
-    temp_max = 28
-    if 6 <= hora_actual <= 15:
-        progreso = (hora_actual - 6) / (15 - 6)  
-        temperatura = temp_min + (temp_max - temp_min) * progreso
-    else:
-        if hora_actual > 15:
-            progreso = (hora_actual - 15) / (24 - 15 + 6) 
-        else:  
-            progreso = (hora_actual + 9) / (24 - 15 + 6)
-        temperatura = temp_max - (temp_max - temp_min) * progreso
-    temperatura += random.normalvariate(0, 0.8)
-    temperatura = round(max(5.0, min(27.0, temperatura)), 1)
-    humedad = round(random.uniform(0.0, 1.5), 1)
-    hora = timestamp_actual.hour
-    if 5 <= hora < 8:  
-        luz = random.randint(300, 1000)
-    elif 8 <= hora < 11:  
-        luz = random.randint(1000, 2500)
-    elif 11 <= hora < 15:  
-        luz = random.randint(2500, 4000)
-    elif 15 <= hora < 18: 
-        luz = random.randint(1500, 3000)
-    elif 18 <= hora < 21:  
-        luz = random.randint(300, 1000)
-    else: 
-        luz = random.randint(0, 200)
-    movimiento = 1 if random.random() < 0.05 else 0
-    return {
-        "_id": str(uuid.uuid4().hex),
-        "dispositivo": dispositivo_id,
-        "temperatura": temperatura,
-        "humedad": humedad,
-        "luz": luz,
-        "movimiento": movimiento,
-        "timestamp": timestamp_actual.isoformat()
-    }
+# Ruta para recibir datos del ESP32
+@app.route("/api/data", methods=["POST"])
+def recibir_dato():
+    try:
+        data = request.get_json()
+        print("JSON recibido:", data)
 
-def simulador():
-    print("Simulador iniciado... Enviando datos a MongoDB cada 60 segundos.")
-    while True:
-        ahora = datetime.now() - timedelta(hours=6)
-        dato = generar_dato(ahora) 
-        collection.insert_one(dato)
-        print(f"[{ahora}] Dato insertado: {dato}")
-        time.sleep(60)
+        required_keys = ["dispositivo", "temperatura", "humedad", "luz", "movimiento"]
+        if not all(k in data for k in required_keys):
+            return jsonify({"error": "Faltan campos"}), 400
 
-@app.route('/')
-def home():
-    return 'API Flask con MongoDB funcionando en Render', 200
+        if not (isinstance(data["temperatura"], (int, float)) and
+                isinstance(data["humedad"], (int, float)) and
+                isinstance(data["luz"], int) and
+                isinstance(data["movimiento"], int)):
+            return jsonify({"error": "Tipos inválidos"}), 400
 
+        documento = {
+            "dispositivo": data["dispositivo"],
+            "temperatura": float(data["temperatura"]),
+            "humedad": float(data["humedad"]),
+            "luz": int(data["luz"]),
+            "movimiento": int(data["movimiento"]),
+            "timestamp": datetime.utcnow() - timedelta(hours=6)
+        }
+        result = collection.insert_one(documento)
+        return jsonify({"message": "Guardado", "id": str(result.inserted_id)}), 200
+    except Exception as e:
+        print("Error MongoDB:", str(e))
+        return jsonify({"error": str(e)}), 500
+
+# Ruta para ver los últimos 50 datos en JSON
 @app.route("/api/datos", methods=["GET"])
-def obtener_datos():
+def ver_datos():
     datos = list(collection.find().sort("timestamp", -1).limit(50))
-    for dato in datos:
-        dato["_id"] = str(dato["_id"])
-    return jsonify(datos)
+    for d in datos:
+        d["_id"] = str(d["_id"])
+        d["timestamp"] = d["timestamp"].isoformat()
 
+    return jsonify(datos), 200
+
+# Filtro para formatear fecha en plantilla
 @app.template_filter('datetimeformat')
 def datetimeformat(value):
     return datetime.fromisoformat(value).strftime('%Y-%m-%d %H:%M:%S')
 
+# Ruta HTML para visualizar los datos
 @app.route("/datos", methods=["GET"])
 def ver_datos_html():
     datos = list(collection.find().sort("timestamp", -1).limit(50))
-    for dato in datos:
-        dato["_id"] = str(dato["_id"])
+    for d in datos:
+        d["_id"] = str(d["_id"])
+        d["timestamp"] = d["timestamp"].isoformat()
 
     template_html = """
     <!DOCTYPE html>
@@ -93,18 +74,20 @@ def ver_datos_html():
         <meta charset="UTF-8">
         <title>Datos de sensores</title>
         <style>
-            body { font-family: Arial, sans-serif; padding: 20px; }
-            table { border-collapse: collapse; width: 100%; }
+            body { font-family: Arial, sans-serif; padding: 20px; background-color: #f9f9f9; }
+            h2 { color: #333; }
+            table { border-collapse: collapse; width: 100%; margin-top: 20px; }
             th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
-            th { background-color: #f2f2f2; }
+            th { background-color: #e0e0e0; }
+            tr:nth-child(even) { background-color: #f2f2f2; }
         </style>
     </head>
     <body>
-        <h2>Datos Recientes del Sensor</h2>
+        <h2>Últimos 50 datos del sensor</h2>
         <table>
             <thead>
                 <tr>
-                    <th>Fecha y hora</th>
+                    <th>Fecha y Hora</th>
                     <th>Temperatura (°C)</th>
                     <th>Humedad (%)</th>
                     <th>Luz (lux)</th>
@@ -112,7 +95,7 @@ def ver_datos_html():
                 </tr>
             </thead>
             <tbody>
-            {% for dato in datos %}
+                {% for dato in datos %}
                 <tr>
                     <td>{{ dato.timestamp | datetimeformat }}</td>
                     <td>{{ dato.temperatura }}</td>
@@ -120,7 +103,7 @@ def ver_datos_html():
                     <td>{{ dato.luz }}</td>
                     <td>{{ "Sí" if dato.movimiento else "No" }}</td>
                 </tr>
-            {% endfor %}
+                {% endfor %}
             </tbody>
         </table>
     </body>
@@ -128,6 +111,10 @@ def ver_datos_html():
     """
     return render_template_string(template_html, datos=datos)
 
+# Ruta de inicio
+@app.route("/", methods=["GET"])
+def index():
+    return "API Flask con MongoDB funcionando en Render", 200
+
 if __name__ == "__main__":
-    Thread(target=simulador, daemon=True).start()
-    app.run(host="0.0.0.0", port=10000)
+    app.run(host="0.0.0.0", port=5000)
