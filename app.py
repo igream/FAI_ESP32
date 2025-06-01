@@ -47,6 +47,8 @@ def recibir_dato():
 # Ruta para ver los últimos 50 datos en JSON
 @app.route("/api/datos", methods=["GET"])
 def ver_datos():
+    datos = list(collection.find().sort("timestamp", -1).limit(50)) 
+
     for d in datos:
         d["_id"] = str(d["_id"])
         ts = d.get("timestamp")
@@ -54,12 +56,10 @@ def ver_datos():
             d["timestamp"] = ts.isoformat()
         elif isinstance(ts, str):
             try:
-                # Aseguramos que sea en formato ISO válido
                 d["timestamp"] = datetime.fromisoformat(ts).isoformat()
             except ValueError:
-                # Si no es válido, lo dejamos como está o lo marcas como inválido si quieres
                 d["timestamp"] = "INVALID_TIMESTAMP"
-                
+
     return jsonify(datos), 200
 
 # Filtro para formatear fecha en plantilla
