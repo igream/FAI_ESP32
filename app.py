@@ -49,9 +49,17 @@ def recibir_dato():
 def ver_datos():
     for d in datos:
         d["_id"] = str(d["_id"])
-        if isinstance(d["timestamp"], datetime):
-            d["timestamp"] = d["timestamp"].isoformat()
-            
+        ts = d.get("timestamp")
+        if isinstance(ts, datetime):
+            d["timestamp"] = ts.isoformat()
+        elif isinstance(ts, str):
+            try:
+                # Aseguramos que sea en formato ISO válido
+                d["timestamp"] = datetime.fromisoformat(ts).isoformat()
+            except ValueError:
+                # Si no es válido, lo dejamos como está o lo marcas como inválido si quieres
+                d["timestamp"] = "INVALID_TIMESTAMP"
+                
     return jsonify(datos), 200
 
 # Filtro para formatear fecha en plantilla
